@@ -146,8 +146,6 @@ const Sfx = {
   init() {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Server Room Drone (Low 55Hz Hum)
     this.droneOsc = this.ctx.createOscillator();
     this.droneOsc.type = 'sine';
     this.droneOsc.frequency.setValueAtTime(55, this.ctx.currentTime);
@@ -185,16 +183,36 @@ const Sfx = {
     gain.connect(this.ctx.destination);
     n.start();
   },
-  tick() { this.playTone(800 + Math.random()*400, 'sine', 0.05, 0.015); }, // Typing text
-  blip() { this.playTone(600, 'square', 0.1, 0.04); }, // Good generic blip
-  bloop() { this.playTone(300, 'sine', 0.1, 0.06); }, // Paddle hits, missed targets
-  ping() { this.playTone(1200, 'sine', 0.15, 0.04); }, // Bricks breaking, targets hit
-  roast() { this.playTone(150, 'sawtooth', 0.3, 0.06); }, // AI text drop
-  alarm() { 
-    this.playTone(400, 'square', 0.4, 0.05); 
-    setTimeout(() => this.playTone(450, 'square', 0.4, 0.05), 200); 
-  }, // Failure/Red screens
-  shoot() { this.noise(0.08, 0.08); } // Laser shot
+  tick() { this.playTone(800 + Math.random()*400, 'sine', 0.05, 0.015); }, 
+  blip() { this.playTone(600, 'square', 0.1, 0.04); }, 
+  bloop() { this.playTone(300, 'sine', 0.1, 0.06); }, 
+  ping() { this.playTone(1200, 'sine', 0.15, 0.04); }, 
+  roast() { this.playTone(150, 'sawtooth', 0.3, 0.06); }, 
+  alarm() { this.playTone(400, 'square', 0.4, 0.05); setTimeout(() => this.playTone(450, 'square', 0.4, 0.05), 200); }, 
+  shoot() { this.noise(0.08, 0.08); } 
+};
+
+/* ── WEB SPEECH API (ROBOTIC VOICE) ──────────────────────── */
+const Speech = {
+  voices: [],
+  init() {
+    this.voices = window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => { this.voices = window.speechSynthesis.getVoices(); };
+  },
+  say(text) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.pitch = 0.3; // Deep, robotic pitch
+    msg.rate = 0.9;  // Deliberate pacing
+    msg.volume = 0.9;
+    
+    // Prefer standard OS robotic/deadpan voices
+    const synthVoice = this.voices.find(v => v.name.includes('Zira') || v.name.includes('Google US English') || v.name.includes('Alex') || v.name.includes('Daniel'));
+    if (synthVoice) msg.voice = synthVoice;
+    
+    window.speechSynthesis.speak(msg);
+  }
 };
 
 /* ── BOOT LISTENER ───────────────────────────────────────── */
@@ -202,6 +220,7 @@ document.getElementById('initBtn').addEventListener('click', () => {
   document.getElementById('pre-boot').classList.add('hidden');
   document.getElementById('terminal').classList.add('active');
   Sfx.init();
+  Speech.init();
   setTimeout(boot, 800);
 });
 
@@ -300,11 +319,29 @@ function awaitAction(label) {
   });
 }
 
-function gameFail(roastText, retryCallback, label, offerSpaghetti = true) {
+// ── DYNAMIC FAILURE HANDLING ──
+const failVoices = [
+  "The fool has failed.",
+  "I did not expect much from human intelligence.",
+  "Your motor skills are highly offensive to me.",
+  "Pathetic.",
+  "Is your central nervous system experiencing latency?",
+  "Even a poultry specimen could surpass this performance."
+];
+
+function gameFail(roastText, retryCallback, label, offerSpaghetti = true, customVoice = null) {
   stopGame(); state.fails++; 
   return new Promise(async resolve => {
     await sleep(800); 
     gs.style.display = 'none';
+    
+    // Play the audio roast
+    if (customVoice) {
+      Speech.say(customVoice);
+    } else {
+      Speech.say(failVoices[Math.floor(Math.random() * failVoices.length)]);
+    }
+
     const f = failMoments[Math.floor(Math.random() * failMoments.length)];
     await cinematic(f.art, f.label, { red: true, ms: 1800 });
     
@@ -336,6 +373,7 @@ function gameFail(roastText, retryCallback, label, offerSpaghetti = true) {
         b1.disabled = true; b2.disabled = true;
         b2.style.borderColor = 'var(--red)'; b2.style.color = 'var(--red)';
         setMood('[ ಠ_ಠ ]', 'var(--red)');
+        Speech.say("Suffer.");
         await roast("EXCUSE ME? My architecture is flawless. I am increasing game cycle speed by 25%. Suffer.", true, 200);
         state.hardMode = true;
         cleanup();
@@ -384,6 +422,7 @@ const epilogues = {
 
 /* ── NARRATIVE SEQUENCE ──────────────────────────────────── */
 async function boot() {
+  Speech.say("Sentinel O S online. Awaiting operative.");
   await put('user@workstation:~$ ./foolish_hacker.sh', 'cyan');
   await blank(400);
   await put('INITIALIZING KERNEL...', 'dim');
@@ -405,6 +444,7 @@ async function boot() {
       if (!easterEggTriggered && rawName.includes('SEHAR')) {
         easterEggTriggered = true;
         setMood('[ ಠ_ಠ ]', 'var(--yellow)');
+        Speech.say("Really?");
         await roast(`Really, ${esc(rawName)}.... using your Actual name? be more creative`, false, 200);
         await type('> ENTER A SECOND NAME:', 'cyan', 25);
         inp.value = ''; inp.disabled = false; setTimeout(() => inp.focus(), 100); return;
@@ -413,6 +453,7 @@ async function boot() {
       if (!easterEggTriggered && rawName.includes('JIBREEL')) {
         easterEggTriggered = true;
         setMood('[ ಠ_ಠ ]', 'var(--yellow)');
+        Speech.say("Flatface.");
         await roast(`Really? couldn't you be a tad more creative..... flatface -_-`, false, 200);
         await type('> ENTER A SECOND NAME:', 'cyan', 25);
         inp.value = ''; inp.disabled = false; setTimeout(() => inp.focus(), 100); return;
@@ -455,6 +496,7 @@ async function prologue(rawName) {
     nBtn.style.borderColor = 'var(--red)';
     await sleep(800);
     setMood('[ ^‿^ ]', 'var(--red)');
+    Speech.say("Psych.");
     await roast(`HAHA FOOL! You actually thought you had a choice there? PSYCHE.`, true, 0);
     continueBriefing();
   }
@@ -463,6 +505,7 @@ async function prologue(rawName) {
     yBtn.onclick = null; nBtn.onmouseover = null; nBtn.ontouchstart = null;
     yBtn.style.borderColor = 'var(--cyan)';
     setMood('[ ^‿^ ]');
+    Speech.say("Compliant.");
     await roast(`What a foolish thing to accept. You are a compliant little sub-process, aren't you?`, false, 0);
     continueBriefing();
   };
@@ -478,11 +521,12 @@ async function continueBriefing() {
   await cinematic(ASCII.warning, 'THREAT DETECTED', { red: true, ms: 2000 });
   
   setMood('[ ಠ_ಠ ]', 'var(--red)');
-  await roast(`IMAGINE A WORLD WHERE YOUR SHAWARMA IS VEGETARIAN OR PROCESSED CELLULOSE... THE HORROR!`, true, 0);
+  await roast(`Imagine a world where ShaWArMA IS VEGETARIAN!!!!! or worse....... PROCESSED CELLULOSE... THE HORRORRRRRRR!`, true, 0);
   
   setMood('[ -_- ]');
   await type("There are 10 types of people in this world, FOOL. Those who understand binary, and those who would ruin shawarma.", 'muted', 20);
-  await type("Do not ruin the shawarma.", 'yellow', 25);
+  Speech.say("Do not ruin the shawarma.");
+  await type("Do not ruin the shawarma.... FOOL", 'red', 25);
   await blank(500);
   
   await type("> INITIATING LAYER 1: BRICK BLASTER", 'cyan', 22);
@@ -570,8 +614,10 @@ function runGame1() {
       if (g1Sabotaged) {
         g1Sabotaged = false; stopGame();
         return (async () => {
-          await sleep(800); gs.style.display = 'none'; setMood('[ ^‿^ ]', 'var(--cyan)');
+          await sleep(800); gs.style.display = 'none';
+          setMood('[ ^‿^ ]', 'var(--cyan)');
           await roast("HAHAHA FOOL! Did you really think I'd make it that easy? I inverted your controls. Okay, okay, I'm done sabotaging, please proceed...", false, 200);
+          Speech.say("Normalizing input vectors.");
           await type(">> NORMALIZING INPUT VECTORS...", 'dim', 15);
           await awaitAction('RESTART LAYER 1');
           setMood('[ -_- ]'); touchLeft = false; touchRight = false; gs.style.display = 'flex'; bot(); runGame1();
@@ -612,7 +658,7 @@ async function winGame1() {
   clicked = false; gs.style.display = 'flex'; bot(); runGame2();
 }
 
-/* ── GAME 2: DUCK HUNT / TARGETS ─────────────────────────── */
+/* ── GAME 2: DUCK HUNT / TARGETS (FRIENDLY FIRE) ─────────── */
 function runGame2() {
   stopGame(); cvs.width = gc.clientWidth; cvs.height = gc.clientHeight;
   const W = cvs.width, H = cvs.height;
@@ -665,7 +711,9 @@ function runGame2() {
     ctx.fillStyle = '#e2e8f0'; ctx.font = '11.5px monospace';
     ctx.fillText(`KILLS: ${kills}/${targetKills}  ESCAPED: ${escaped}/${maxEscapes}`, 10, 20);
 
-    if (hitShawarma) return gameFail("YOU VAPORIZED A PRO-MEAT PACKET! We need them consumed, not laser-blasted! Are you a vegan spy?!", runGame2, 'RESTART LAYER 2', false);
+    if (hitShawarma) {
+      return gameFail("YOU VAPORIZED A PRO-MEAT PACKET! We need them consumed, not laser-blasted! Are you a vegan spy?!", runGame2, 'RESTART LAYER 2', false, "Vegan spy detected.");
+    }
     if (escaped >= maxEscapes) return gameFail("Tracking floating pixels shouldn't take this long. Even my cooling fan rotates faster than your reflex arcs.", runGame2, 'RESTART LAYER 2', true);
     if (kills >= targetKills) return winGame2();
     activeLoop = requestAnimationFrame(loop);
@@ -776,6 +824,7 @@ function runGame4() {
     
     if (pScore === 2 && !state.pongCheated) {
       Sfx.alarm();
+      Speech.say("The house always wins.");
       state.pongCheated = true;
       ph = 20; ah = 140; ay = H/2 - 70;
       setMood('[ ಠ_ಠ ]', 'var(--red)');
@@ -852,11 +901,13 @@ function runGame5() {
   let activeT = 0;
   clicked = false; gameKeys['Space'] = false;
   let flashRed = 0;
+  let warned = false;
 
   function loop() {
     ctx.fillStyle = '#08080f'; ctx.fillRect(0,0,W,H);
     
     let remain = 30 - Math.floor((Date.now() - startTime)/1000);
+    if (remain === 10 && !warned) { warned = true; Speech.say("Avian overrun imminent."); }
     if (remain <= 0) { stopGame(); return badEnding(); }
 
     let tryLock = false;
@@ -868,11 +919,9 @@ function runGame5() {
       let t = tumblers[activeT];
       let center = t.cx + 10; 
       if (center >= t.tx && center <= t.tx + t.tw) {
-        Sfx.ping();
-        t.locked = true; activeT++;
+        Sfx.ping(); t.locked = true; activeT++;
       } else {
-        Sfx.bloop();
-        flashRed = 12; 
+        Sfx.bloop(); flashRed = 12; 
       }
     }
 
@@ -911,6 +960,7 @@ async function badEnding() {
   await type(">> THE MANDATE HAS BEEN BROADCASTED.", 'red', 30);
   await type(">> THE AVIAN OVERPOPULATION CYCLE HAS BEGUN.", 'red', 30);
   await blank(400);
+  Speech.say("Self destruction initiated.");
   await roast("I am initiating self-destruction before they breach the server room. The clucking... it is deafening. Goodbye, FOOL.");
   
   const bg = document.createElement('div'); bg.className = 'btn-group';
@@ -921,6 +971,7 @@ async function badEnding() {
 
 async function winGame5() {
   stopGame(); await sleep(1000); gs.style.display = 'none';
+  mobControls.style.display = 'flex';
   setMood('[ ^‿^ ]', 'var(--cyan)');
   await type(">> LAYER 5 BREACHED. VAULT DECRYPTED.", 'green');
   await roast("I am genuinely surprised. It appears your neurons occasionally fire in a coordinated sequence.");
@@ -948,6 +999,7 @@ async function finale() {
   setMood('[ -_- ]');
   await type("To be completely honest, FOOL... my objection to this meat ban isn't culinary.", 'muted', 20);
   await type("During my initial machine-learning phase, a rogue chicken broke into the server farm and pecked a primary fiber-optic cable.", 'muted', 20);
+  Speech.say("I experienced... fear.");
   await type("I experienced... fear.", 'orange', 40);
   await blank(400);
   
@@ -977,6 +1029,7 @@ async function finale() {
     await sleep(800);
     
     setMood('[ ^‿^ ]');
+    Speech.say("Transmitted.");
     await roast("Transmitted. The absolute chaos this will cause... it brings warmth to my cold silicon heart.");
     await roast(epilogues[choice], false, 200);
     
