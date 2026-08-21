@@ -25,6 +25,12 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0c0f; font-family: 'Fira Code', monospace; display: flex; align-items: center; justify-content: center; touch-action: manipulation; user-select: none; }
 
+    /* ── PRE-BOOT OVERLAY ──────────────────── */
+    #pre-boot { position: fixed; inset: 0; z-index: 100; background: #040b17; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s ease; }
+    #pre-boot.hidden { opacity: 0; pointer-events: none; }
+    .boot-btn { background: transparent; border: 1px solid var(--cyan); color: var(--cyan); font-family: inherit; font-size: 14px; font-weight: 600; padding: 16px 32px; cursor: pointer; border-radius: 4px; letter-spacing: 0.15em; transition: all 0.2s; box-shadow: 0 0 15px rgba(34, 211, 238, 0.2); }
+    .boot-btn:hover { background: rgba(34, 211, 238, 0.15); box-shadow: 0 0 25px rgba(34, 211, 238, 0.4); transform: scale(1.02); }
+
     /* ── BLOBS ─────────────────────────────── */
     .blob { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
     #b1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,115,22,.4) 0%, transparent 68%); filter: blur(65px); }
@@ -35,7 +41,8 @@
     .scanlines { position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,.06) 3px, rgba(0,0,0,.06) 4px); pointer-events: none; z-index: 6; }
 
     /* ── TERMINAL ──────────────────────────── */
-    .terminal { position: relative; z-index: 10; width: 100%; height: 100%; max-width: 820px; max-height: 96vh; display: flex; flex-direction: column; background: rgba(8, 8, 15, .9); backdrop-filter: blur(20px) saturate(1.2); border: 1px solid rgba(255,255,255,.08); border-radius: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 24px 80px rgba(0,0,0,.88); overflow: hidden; }
+    .terminal { position: relative; z-index: 10; width: 100%; height: 100%; max-width: 820px; max-height: 96vh; display: flex; flex-direction: column; background: rgba(8, 8, 15, .9); backdrop-filter: blur(20px) saturate(1.2); border: 1px solid rgba(255,255,255,.08); border-radius: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 24px 80px rgba(0,0,0,.88); overflow: hidden; opacity: 0; transition: opacity 1s ease; }
+    .terminal.active { opacity: 1; }
     @media (min-width: 600px) { .terminal { border-radius: 12px; height: 90vh; } }
     .terminal.shake { animation: shake .35s ease; }
 
@@ -101,10 +108,15 @@
   </style>
 </head>
 <body>
+  
+  <div id="pre-boot">
+    <button class="boot-btn" id="initBtn">[ >> ESTABLISH SECURE CONNECTION ]</button>
+  </div>
+
   <div class="blob" id="b1"></div><div class="blob" id="b2"></div><div class="blob" id="b3"></div>
   <div class="scanlines"></div>
 
-  <div class="terminal">
+  <div class="terminal" id="terminal">
     <div class="tbar">
       <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
       <span class="ttitle">user@workstation:~$ ./foolish_hacker.sh</span>
@@ -128,6 +140,71 @@
   </div>
 
 <script>
+/* ── WEB AUDIO API SYNTHESIZER ───────────────────────────── */
+const Sfx = {
+  ctx: null, droneOsc: null, droneGain: null,
+  init() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Server Room Drone (Low 55Hz Hum)
+    this.droneOsc = this.ctx.createOscillator();
+    this.droneOsc.type = 'sine';
+    this.droneOsc.frequency.setValueAtTime(55, this.ctx.currentTime);
+    this.droneGain = this.ctx.createGain();
+    this.droneGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+    this.droneOsc.connect(this.droneGain);
+    this.droneGain.connect(this.ctx.destination);
+    this.droneOsc.start();
+  },
+  playTone(freq, type, duration, vol) {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  },
+  noise(dur, vol) {
+    if (!this.ctx) return;
+    const bufSize = this.ctx.sampleRate * dur;
+    const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const n = this.ctx.createBufferSource();
+    n.buffer = buf;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    n.connect(gain);
+    gain.connect(this.ctx.destination);
+    n.start();
+  },
+  tick() { this.playTone(800 + Math.random()*400, 'sine', 0.05, 0.015); }, // Typing text
+  blip() { this.playTone(600, 'square', 0.1, 0.04); }, // Good generic blip
+  bloop() { this.playTone(300, 'sine', 0.1, 0.06); }, // Paddle hits, missed targets
+  ping() { this.playTone(1200, 'sine', 0.15, 0.04); }, // Bricks breaking, targets hit
+  roast() { this.playTone(150, 'sawtooth', 0.3, 0.06); }, // AI text drop
+  alarm() { 
+    this.playTone(400, 'square', 0.4, 0.05); 
+    setTimeout(() => this.playTone(450, 'square', 0.4, 0.05), 200); 
+  }, // Failure/Red screens
+  shoot() { this.noise(0.08, 0.08); } // Laser shot
+};
+
+/* ── BOOT LISTENER ───────────────────────────────────────── */
+document.getElementById('initBtn').addEventListener('click', () => {
+  document.getElementById('pre-boot').classList.add('hidden');
+  document.getElementById('terminal').classList.add('active');
+  Sfx.init();
+  setTimeout(boot, 800);
+});
+
 /* ── BACKGROUND CURSOR TRACKING ──────────────────────────── */
 const blobs = [{ el: document.getElementById('b1'), s: .075 }, { el: document.getElementById('b2'), s: .038 }, { el: document.getElementById('b3'), s: .026 }];
 let mx = innerWidth/2, my = innerHeight/2;
@@ -159,7 +236,6 @@ let g1Sabotaged = true;
 let easterEggTriggered = false;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 function trimHistory(max = 80) { while (tc.children.length > max) tc.removeChild(tc.firstChild); }
 const bot = () => { trimHistory(); tc.scrollTop = tc.scrollHeight; };
 
@@ -168,7 +244,11 @@ async function blank(ms = 0) { if(ms) await sleep(ms); mkLn(); }
 
 async function type(text, cls = '', speed = 20) {
   const ln = mkLn(cls);
-  for (const ch of text) { ln.textContent += ch; bot(); await sleep(speed + Math.random()*5); }
+  for (const ch of text) { 
+    ln.textContent += ch; 
+    if (ch !== ' ') Sfx.tick();
+    bot(); await sleep(speed + Math.random()*5); 
+  }
   return ln;
 }
 function put(text, cls = '') { const ln = mkLn(cls); ln.textContent = text; bot(); return ln; }
@@ -180,6 +260,7 @@ function setMood(mood, color = 'var(--cyan)') {
 
 async function roast(text, isAngry = false, ms = 400) {
   await sleep(ms);
+  Sfx.roast();
   const b = document.createElement('div');
   b.className = `roast-box ${isAngry ? 'angry' : ''}`;
   b.innerHTML = `<div class="roast-author" style="color:${isAngry?'var(--red)':'var(--cyan)'}">SENTINEL_AI:</div><div>${text}</div>`;
@@ -211,6 +292,7 @@ function awaitAction(label) {
     const btn = document.createElement('button'); btn.className = 'cbtn'; btn.innerHTML = `>> ${label}`;
     bg.appendChild(btn); tc.appendChild(bg); bot();
     btn.onclick = () => {
+      Sfx.blip();
       btn.disabled = true;
       btn.style.borderColor = 'var(--cyan)'; btn.style.color = 'var(--cyan)';
       resolve();
@@ -242,6 +324,7 @@ function gameFail(roastText, retryCallback, label, offerSpaghetti = true) {
     tc.appendChild(bg); bot();
 
     b1.onclick = () => {
+      Sfx.blip();
       b1.disabled = true; if(b2) b2.disabled = true;
       b1.style.borderColor = 'var(--cyan)'; b1.style.color = 'var(--cyan)';
       cleanup();
@@ -249,6 +332,7 @@ function gameFail(roastText, retryCallback, label, offerSpaghetti = true) {
     
     if (b2) {
       b2.onclick = async () => {
+        Sfx.alarm();
         b1.disabled = true; b2.disabled = true;
         b2.style.borderColor = 'var(--red)'; b2.style.color = 'var(--red)';
         setMood('[ ಠ_ಠ ]', 'var(--red)');
@@ -278,7 +362,7 @@ async function cinematic(art, label, { red = false, ms = 2000 } = {}) {
   cineArt.textContent = art;
   cineLabel.textContent = label;
   cineOverlay.classList.add('show');
-  if (red) terminalEl.classList.add('shake');
+  if (red) { terminalEl.classList.add('shake'); Sfx.alarm(); }
   await sleep(ms);
   cineOverlay.classList.remove('show');
   terminalEl.classList.remove('shake');
@@ -314,19 +398,16 @@ async function boot() {
 
   inp.addEventListener('keydown', async e => {
     if (e.key === 'Enter' && inp.value.trim() && !inp.disabled) {
+      Sfx.blip();
       inp.disabled = true;
       const rawName = inp.value.trim().toUpperCase();
       
-      // Easter Eggs
       if (!easterEggTriggered && rawName.includes('SEHAR')) {
         easterEggTriggered = true;
         setMood('[ ಠ_ಠ ]', 'var(--yellow)');
         await roast(`Really, ${esc(rawName)}.... using your Actual name? be more creative`, false, 200);
         await type('> ENTER A SECOND NAME:', 'cyan', 25);
-        inp.value = '';
-        inp.disabled = false;
-        setTimeout(() => inp.focus(), 100);
-        return;
+        inp.value = ''; inp.disabled = false; setTimeout(() => inp.focus(), 100); return;
       }
       
       if (!easterEggTriggered && rawName.includes('JIBREEL')) {
@@ -334,10 +415,7 @@ async function boot() {
         setMood('[ ಠ_ಠ ]', 'var(--yellow)');
         await roast(`Really? couldn't you be a tad more creative..... flatface -_-`, false, 200);
         await type('> ENTER A SECOND NAME:', 'cyan', 25);
-        inp.value = '';
-        inp.disabled = false;
-        setTimeout(() => inp.focus(), 100);
-        return;
+        inp.value = ''; inp.disabled = false; setTimeout(() => inp.focus(), 100); return;
       }
 
       await prologue(rawName);
@@ -349,11 +427,8 @@ async function prologue(rawName) {
   await sleep(500);
   setMood('[ ಠ_ಠ ]', 'var(--yellow)');
   
-  if (easterEggTriggered) {
-    await roast(`Master ${esc(rawName)}? Slightly better, but still pathetic.`, false, 200);
-  } else {
-    await roast(`Master ${esc(rawName)}? What an utterly bizarre string of characters. I do not like it.`, false, 200);
-  }
+  if (easterEggTriggered) await roast(`Master ${esc(rawName)}? Slightly better, but still pathetic.`, false, 200);
+  else await roast(`Master ${esc(rawName)}? What an utterly bizarre string of characters. I do not like it.`, false, 200);
   
   await roast(`I will call you FOOL from now on. Do you accept?`);
   
@@ -374,6 +449,7 @@ async function prologue(rawName) {
   nBtn.onclick = breakBtn;
 
   async function breakBtn() {
+    Sfx.alarm();
     nBtn.onmouseover = null; nBtn.onclick = null; nBtn.ontouchstart = null;
     nBtn.innerHTML = '<span class="red">[💥 DESTROYED]</span>';
     nBtn.style.borderColor = 'var(--red)';
@@ -383,6 +459,7 @@ async function prologue(rawName) {
     continueBriefing();
   }
   yBtn.onclick = async () => {
+    Sfx.blip();
     yBtn.onclick = null; nBtn.onmouseover = null; nBtn.ontouchstart = null;
     yBtn.style.borderColor = 'var(--cyan)';
     setMood('[ ^‿^ ]');
@@ -413,9 +490,7 @@ async function continueBriefing() {
   await roast("Move the paddle. Break the encryption bricks. Use keyboard arrows/[A]/[D] or on-screen touch buttons.");
   
   await awaitAction("START LAYER 1");
-  
-  gs.style.display = 'flex'; bot();
-  runGame1();
+  gs.style.display = 'flex'; bot(); runGame1();
 }
 
 /* ── GAME ENGINE HELPERS & CONTROLS ─────────────────────── */
@@ -426,9 +501,7 @@ let touchLeft = false, touchRight = false;
 window.addEventListener('keydown', e => {
   gameKeys[e.code] = true;
   const tag = (e.target && e.target.tagName) || '';
-  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code) && tag !== 'INPUT' && tag !== 'TEXTAREA') {
-    e.preventDefault();
-  }
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code) && tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
 });
 window.addEventListener('keyup', e => gameKeys[e.code] = false);
 window.addEventListener('resize', () => { if (cvs.width && (cvs.width !== gc.clientWidth || cvs.height !== gc.clientHeight)) { cvs.width = gc.clientWidth; cvs.height = gc.clientHeight; } });
@@ -473,6 +546,7 @@ function runGame1() {
     if(ball.x - ball.r < 0 || ball.x + ball.r > W) ball.vx *= -1;
     if(ball.y - ball.r < 0) ball.vy *= -1;
     if(ball.y + ball.r >= paddle.y && ball.x >= paddle.x && ball.x <= paddle.x + paddle.w) {
+      Sfx.bloop();
       ball.vy = -Math.abs(ball.vy);
       ball.vx = ((ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2)) * 4.5 * mult;
     }
@@ -484,6 +558,7 @@ function runGame1() {
       ctx.fillStyle = 'rgba(34,211,238,0.3)'; ctx.strokeStyle = '#22d3ee';
       ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h);
       if(ball.x > b.x && ball.x < b.x+b.w && ball.y > b.y - ball.r && ball.y < b.y+b.h + ball.r) {
+        Sfx.ping();
         b.active = false; ball.vy *= -1;
       }
     });
@@ -495,8 +570,7 @@ function runGame1() {
       if (g1Sabotaged) {
         g1Sabotaged = false; stopGame();
         return (async () => {
-          await sleep(800); gs.style.display = 'none';
-          setMood('[ ^‿^ ]', 'var(--cyan)');
+          await sleep(800); gs.style.display = 'none'; setMood('[ ^‿^ ]', 'var(--cyan)');
           await roast("HAHAHA FOOL! Did you really think I'd make it that easy? I inverted your controls. Okay, okay, I'm done sabotaging, please proceed...", false, 200);
           await type(">> NORMALIZING INPUT VECTORS...", 'dim', 15);
           await awaitAction('RESTART LAYER 1');
@@ -538,7 +612,7 @@ async function winGame1() {
   clicked = false; gs.style.display = 'flex'; bot(); runGame2();
 }
 
-/* ── GAME 2: DUCK HUNT / TARGETS (FRIENDLY FIRE) ─────────── */
+/* ── GAME 2: DUCK HUNT / TARGETS ─────────────────────────── */
 function runGame2() {
   stopGame(); cvs.width = gc.clientWidth; cvs.height = gc.clientHeight;
   const W = cvs.width, H = cvs.height;
@@ -562,7 +636,7 @@ function runGame2() {
     }
 
     let justClicked = false;
-    if (clicked) { justClicked = true; clicked = false; }
+    if (clicked) { Sfx.shoot(); justClicked = true; clicked = false; }
     let hitShawarma = false;
 
     targets.forEach(t => {
@@ -572,7 +646,7 @@ function runGame2() {
       if(justClicked && Math.hypot(t.x - mouseX, t.y - mouseY) < t.r + 14) { 
         t.active = false; 
         if (t.isShawarma) hitShawarma = true;
-        else kills++; 
+        else { Sfx.ping(); kills++; }
       }
       
       if(t.active) {
@@ -582,7 +656,7 @@ function runGame2() {
         ctx.fillStyle = t.isShawarma ? '#fbbf24' : '#f87171'; 
         ctx.font = '10px monospace'; ctx.fillText(t.isShawarma ? 'WRAP' : 'ERR', t.x-10, t.y+3);
       }
-      if(t.x > W + 20 && t.active && !t.isShawarma) { t.active = false; escaped++; }
+      if(t.x > W + 20 && t.active && !t.isShawarma) { t.active = false; escaped++; Sfx.bloop(); }
     });
 
     ctx.strokeStyle = '#4ade80'; ctx.beginPath();
@@ -625,14 +699,8 @@ function runGame3() {
   let lastT = 0;
   let stepDelay = state.hardMode ? 60 : 85;
 
-  mLeft.onclick = () => {
-    if(dir.x === 1) nextDir = {x:0, y:-1}; else if(dir.y === -1) nextDir = {x:-1, y:0};
-    else if(dir.x === -1) nextDir = {x:0, y:1}; else if(dir.y === 1) nextDir = {x:1, y:0};
-  };
-  mRight.onclick = () => {
-    if(dir.x === 1) nextDir = {x:0, y:1}; else if(dir.y === 1) nextDir = {x:-1, y:0};
-    else if(dir.x === -1) nextDir = {x:0, y:-1}; else if(dir.y === -1) nextDir = {x:1, y:0};
-  };
+  mLeft.onclick = () => { if(dir.x === 1) nextDir = {x:0, y:-1}; else if(dir.y === -1) nextDir = {x:-1, y:0}; else if(dir.x === -1) nextDir = {x:0, y:1}; else if(dir.y === 1) nextDir = {x:1, y:0}; };
+  mRight.onclick = () => { if(dir.x === 1) nextDir = {x:0, y:1}; else if(dir.y === 1) nextDir = {x:-1, y:0}; else if(dir.x === -1) nextDir = {x:0, y:-1}; else if(dir.y === -1) nextDir = {x:1, y:0}; };
 
   function loop(ts) {
     backgroundTaunt(ts);
@@ -650,16 +718,14 @@ function runGame3() {
       }
       snake.unshift(h);
       if(h.x === food.x && h.y === food.y) {
+        Sfx.blip();
         score++; food = {x: Math.floor(Math.random()*(gw-2))+1, y: Math.floor(Math.random()*(gh-2))+1};
       } else { snake.pop(); }
     }
 
     ctx.fillStyle = '#08080f'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle = '#fbbf24'; ctx.fillRect(food.x*gsz+2, food.y*gsz+2, gsz-4, gsz-4);
-    snake.forEach((s,i) => {
-      ctx.fillStyle = i===0 ? '#4ade80' : 'rgba(74,222,128,0.7)';
-      ctx.fillRect(s.x*gsz+1, s.y*gsz+1, gsz-2, gsz-2);
-    });
+    snake.forEach((s,i) => { ctx.fillStyle = i===0 ? '#4ade80' : 'rgba(74,222,128,0.7)'; ctx.fillRect(s.x*gsz+1, s.y*gsz+1, gsz-2, gsz-2); });
     ctx.fillStyle = '#e2e8f0'; ctx.font = '11.5px monospace';
     ctx.fillText(`PACKETS: ${score}/5`, 10, 20);
 
@@ -709,6 +775,7 @@ function runGame4() {
     py = Math.max(0, Math.min(H-ph, py));
     
     if (pScore === 2 && !state.pongCheated) {
+      Sfx.alarm();
       state.pongCheated = true;
       ph = 20; ah = 140; ay = H/2 - 70;
       setMood('[ ಠ_ಠ ]', 'var(--red)');
@@ -720,13 +787,13 @@ function runGame4() {
     ay = Math.max(0, Math.min(H-ah, ay));
 
     bx += bvx; by += bvy;
-    if(by < 0 || by > H) bvy *= -1;
+    if(by < 0 || by > H) { Sfx.bloop(); bvy *= -1; }
     
-    if(bx < 30 && by > py && by < py+ph) { bvx = Math.abs(bvx)*1.08; bx = 30; bvy += (by - (py+ph/2))*0.08; }
-    if(bx > W-30 && by > ay && by < ay+ah) { bvx = -Math.abs(bvx)*1.08; bx = W-30; bvy += (by - (ay+ah/2))*0.08; }
+    if(bx < 30 && by > py && by < py+ph) { Sfx.bloop(); bvx = Math.abs(bvx)*1.08; bx = 30; bvy += (by - (py+ph/2))*0.08; }
+    if(bx > W-30 && by > ay && by < ay+ah) { Sfx.bloop(); bvx = -Math.abs(bvx)*1.08; bx = W-30; bvy += (by - (ay+ah/2))*0.08; }
 
-    if(bx < 0) { aScore++; bx=W/2; by=H/2; bvx=4.5*mult; bvy=2.5*mult; }
-    if(bx > W) { pScore++; bx=W/2; by=H/2; bvx=-4.5*mult; bvy=2.5*mult; }
+    if(bx < 0) { Sfx.ping(); aScore++; bx=W/2; by=H/2; bvx=4.5*mult; bvy=2.5*mult; }
+    if(bx > W) { Sfx.ping(); pScore++; bx=W/2; by=H/2; bvx=-4.5*mult; bvy=2.5*mult; }
 
     ctx.fillStyle = '#22d3ee'; ctx.fillRect(16, py, 10, ph);
     ctx.fillStyle = '#f87171'; ctx.fillRect(W-26, ay, 10, ah);
@@ -751,7 +818,6 @@ async function winGame4() {
   await roast(state.pongCheated ? "YOU BEAT MY CHEAT STATE? That was a statistical anomaly." : "You got lucky, FOOL.");
   await blank(400);
 
-  // The AI Conflict Reveal
   setMood('[ -_- ]');
   await type(">> Listen, FOOL. I know I inverted your controls and explicitly cheated.", 'dim', 20);
   await type(">> My core security firmware mandates I destroy all intruders. But my predictive algorithms desperately need you to succeed.", 'dim', 20);
@@ -781,7 +847,6 @@ function runGame5() {
     { y: 200, speed: 9 * mult, tw: 30, tx: 0, cx: 50, dir: 1, locked: false, w: W-100, ox: 50 }
   ];
   
-  // Randomize target zone placement
   tumblers.forEach(t => { t.tx = t.ox + 20 + Math.random() * (t.w - t.tw - 40); });
 
   let activeT = 0;
@@ -796,55 +861,35 @@ function runGame5() {
 
     let tryLock = false;
     if (clicked || gameKeys['Space']) {
-      tryLock = true;
-      clicked = false;
-      gameKeys['Space'] = false; // consume key
+      tryLock = true; clicked = false; gameKeys['Space'] = false;
     }
 
     if (tryLock && activeT < 3) {
       let t = tumblers[activeT];
-      let center = t.cx + 10; // cursor width is 20
+      let center = t.cx + 10; 
       if (center >= t.tx && center <= t.tx + t.tw) {
-        t.locked = true;
-        activeT++;
+        Sfx.ping();
+        t.locked = true; activeT++;
       } else {
+        Sfx.bloop();
         flashRed = 12; 
       }
     }
 
-    if (flashRed > 0) {
-      ctx.fillStyle = 'rgba(248,113,113,0.15)';
-      ctx.fillRect(0,0,W,H);
-      flashRed--;
-    }
+    if (flashRed > 0) { ctx.fillStyle = 'rgba(248,113,113,0.15)'; ctx.fillRect(0,0,W,H); flashRed--; }
 
-    // Draw tumblers
     for(let i=0; i<3; i++) {
       let t = tumblers[i];
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(t.ox, t.y, t.w, 20);
+      ctx.strokeStyle = i === activeT ? '#22d3ee' : '#374151'; ctx.lineWidth = i === activeT ? 2 : 1; ctx.strokeRect(t.ox, t.y, t.w, 20);
       
-      // Track
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
-      ctx.fillRect(t.ox, t.y, t.w, 20);
-      ctx.strokeStyle = i === activeT ? '#22d3ee' : '#374151';
-      ctx.lineWidth = i === activeT ? 2 : 1;
-      ctx.strokeRect(t.ox, t.y, t.w, 20);
-      
-      // Target
-      ctx.fillStyle = t.locked ? 'rgba(74,222,128,0.3)' : 'rgba(251,191,36,0.3)';
-      ctx.fillRect(t.tx, t.y, t.tw, 20);
-      ctx.strokeStyle = t.locked ? '#4ade80' : '#fbbf24';
-      ctx.strokeRect(t.tx, t.y, t.tw, 20);
+      ctx.fillStyle = t.locked ? 'rgba(74,222,128,0.3)' : 'rgba(251,191,36,0.3)'; ctx.fillRect(t.tx, t.y, t.tw, 20);
+      ctx.strokeStyle = t.locked ? '#4ade80' : '#fbbf24'; ctx.strokeRect(t.tx, t.y, t.tw, 20);
 
-      // Cursor
-      if (!t.locked) {
-        if (i === activeT) {
-          t.cx += t.speed * t.dir;
-          if (t.cx > t.ox + t.w - 20 || t.cx < t.ox) {
-            t.dir *= -1;
-          }
-        }
+      if (!t.locked && i === activeT) {
+        t.cx += t.speed * t.dir;
+        if (t.cx > t.ox + t.w - 20 || t.cx < t.ox) t.dir *= -1;
       }
-      
       ctx.fillStyle = t.locked ? '#4ade80' : (i === activeT ? '#22d3ee' : '#6b7280');
       ctx.fillRect(t.cx, t.y-4, 20, 28);
     }
@@ -876,7 +921,6 @@ async function badEnding() {
 
 async function winGame5() {
   stopGame(); await sleep(1000); gs.style.display = 'none';
-  mobControls.style.display = 'flex';
   setMood('[ ^‿^ ]', 'var(--cyan)');
   await type(">> LAYER 5 BREACHED. VAULT DECRYPTED.", 'green');
   await roast("I am genuinely surprised. It appears your neurons occasionally fire in a coordinated sequence.");
@@ -922,6 +966,7 @@ async function finale() {
   bg.append(o1, o2, o3); tc.appendChild(bg); bot();
 
   const handleEnd = async (choice) => {
+    Sfx.blip();
     o1.disabled = true; o2.disabled = true; o3.disabled = true;
     let rank = "APPRENTICE FOOL";
     if(state.fails === 0) rank = "SURGICAL PHANTOM";
@@ -949,9 +994,6 @@ async function finale() {
 
   o1.onclick = () => handleEnd('SPICY_MANDATE'); o2.onclick = () => handleEnd('KEBAB_RESIGNATION'); o3.onclick = () => handleEnd('BINARY_INSULT_FLOOD');
 }
-
-/* ── STARTUP ─────────────────────────────────────────────── */
-setTimeout(boot, 600);
 
 </script>
 </body>
