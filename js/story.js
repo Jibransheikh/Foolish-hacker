@@ -7,6 +7,23 @@ document.getElementById('initBtn').addEventListener('click', () => {
   setTimeout(boot, 800);
 });
 
+/* ── SETTINGS & PAUSE UI ─────────────────────────────────── */
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('settingsOverlay').classList.add('show');
+  document.getElementById('setSpeech').checked = settings.speechOn;
+  document.getElementById('setSfx').checked = settings.sfxOn;
+  document.getElementById('setScanlines').checked = settings.scanlinesOn;
+});
+document.getElementById('settingsClose').addEventListener('click', () => {
+  settings.speechOn = document.getElementById('setSpeech').checked;
+  settings.sfxOn = document.getElementById('setSfx').checked;
+  settings.scanlinesOn = document.getElementById('setScanlines').checked;
+  document.querySelector('.scanlines').style.display = settings.scanlinesOn ? '' : 'none';
+  document.getElementById('settingsOverlay').classList.remove('show');
+  saveState();
+});
+document.getElementById('pauseResume').addEventListener('click', resumeGame);
+
 /* ── BACKGROUND CURSOR TRACKING ──────────────────────────── */
 const blobs = [{ el: document.getElementById('b1'), s: .075 }, { el: document.getElementById('b2'), s: .038 }, { el: document.getElementById('b3'), s: .026 }];
 let mx = innerWidth/2, my = innerHeight/2;
@@ -33,6 +50,18 @@ async function boot() {
   const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'ninput'; inp.maxLength = 15;
   row.appendChild(inp); tc.appendChild(row); bot();
   setTimeout(() => inp.focus(), 100);
+
+  if (state.playCount > 0) {
+    const skipBg = document.createElement('div'); skipBg.className = 'btn-group';
+    const skipBtn = document.createElement('button'); skipBtn.className = 'cbtn'; skipBtn.textContent = '>> [SKIP INTRO]';
+    skipBg.appendChild(skipBtn); tc.appendChild(skipBg); bot();
+    skipBtn.onclick = async () => {
+      Sfx.blip(); skipBtn.disabled = true; skipBtn.style.borderColor = 'var(--cyan)'; skipBtn.style.color = 'var(--cyan)';
+      inp.disabled = true; row.style.display = 'none';
+      state.name = 'FOOL';
+      continueBriefing();
+    };
+  }
 
   inp.addEventListener('keydown', async e => {
     if (e.key === 'Enter' && inp.value.trim() && !inp.disabled) {
@@ -130,14 +159,55 @@ async function continueBriefing() {
   
   await type("> INITIATING LAYER 1: BRICK BLASTER", 'cyan', 22);
   await type("   ▭▭▭▭▭▭  ▬▬▬  ○", 'muted', 15);
-  await roast("Move the paddle. Break the encryption bricks. Use keyboard arrows/[A]/[D] or on-screen touch buttons.");
   
-  await awaitAction("START LAYER 1");
+  setMood('[ -_- ]');
+  await type("Wait. Before we proceed, I am legally required to inform you of your options.", 'light', 20);
+  await type("You may COMPLY with the mission as assigned. Standard protocol.", 'muted', 20);
+  await type("Or you may REFUSE. I should note that refusal has... different consequences.", 'muted', 20);
+  await blank(300);
+
+  const branchBg = document.createElement('div'); branchBg.className = 'btn-group';
+  const complyBtn = document.createElement('button'); complyBtn.className = 'cbtn'; complyBtn.textContent = '[ COMPLY ]';
+  const refuseBtn = document.createElement('button'); refuseBtn.className = 'cbtn cbtn-danger'; refuseBtn.textContent = '[ REFUSE ]';
+  branchBg.appendChild(complyBtn); branchBg.appendChild(refuseBtn); tc.appendChild(branchBg); bot();
+
+  await new Promise(resolve => {
+    complyBtn.onclick = async () => {
+      Sfx.blip();
+      complyBtn.disabled = true; refuseBtn.disabled = true;
+      complyBtn.style.borderColor = 'var(--cyan)'; complyBtn.style.color = 'var(--cyan)';
+      setMood('[ -_- ]');
+      await roast("Good. Compliance is the path of least resistance. And least suffering.", false, 200);
+      await roast("Move the paddle. Break the encryption bricks. Use keyboard arrows/[A]/[D] or on-screen touch buttons.", false, 0);
+      state.pacifist = false;
+      resolve();
+    };
+    refuseBtn.onclick = async () => {
+      Sfx.alarm();
+      complyBtn.disabled = true; refuseBtn.disabled = true;
+      refuseBtn.style.borderColor = 'var(--red)'; refuseBtn.style.color = 'var(--red)';
+      setMood('[ ಠ_ಠ ]', 'var(--orange)');
+      Speech.say("Interesting.");
+      await roast("Oh? A conscience? How absolutely adorable. Let us see how long that moral high ground lasts when things get difficult.", false, 200);
+      setMood('[ ^‿^ ]');
+      await roast("Fine. You want to protect instead of destroy? I will reconfigure the encryption layers. But I am NOT going easy on you.", false, 200);
+      state.pacifist = true;
+      await type(">> RECONFIGURING LAYER 1: DEFENSE MODE", 'orange', 22);
+      await roast("Defend the server core. Catch the incoming packets with your paddle. Do not let them breach the firewall.", false, 0);
+      resolve();
+    };
+  });
+
+  startTimer();
+  setLayer(1);
+  await awaitAction(state.pacifist ? "START LAYER 1 [DEFENSE]" : "START LAYER 1");
   gs.style.display = 'flex'; bot(); runGame1();
 }
 
 
 async function badEnding() {
+  stopTimer();
+  saveHighScore();
   gs.style.display = 'none';
   await cinematic(ASCII.badEnd, 'TIME EXPIRED', { red: true, ms: 3000 });
   setMood('[ ×_× ]', 'var(--red)');
@@ -164,8 +234,27 @@ async function winGame5() {
 }
 
 
+/* ── HIDDEN COMMAND: SHAWARMA ─────────────────────────────── */
+let shawarmaHandled = false;
+async function onShawarmaCommand() {
+  if (shawarmaHandled || state.secretLevelUnlocked) return;
+  shawarmaHandled = true;
+  
+  await blank(200);
+  setMood('[ ಠ_ಠ ]', 'var(--orange)');
+  Speech.say("How do you know that word?");
+  await roast("Wait. How do you know that word? 'Shawarma' is a RESTRICTED TERM in my classified database.", true, 200);
+  await blank(300);
+  await cinematic(ASCII.shawarma, 'CLASSIFIED', { ms: 2000 });
+  setMood('[ ^‿^ ]', 'var(--yellow)');
+  await roast("...Fine. You have demonstrated enough... curiosity... to warrant access to the SHAWARMA LAYER. This stays between us.", false, 200);
+  await type(">> SECRET LAYER UNLOCKED: SHAWARMA ASSEMBLY", 'yellow', 22);
+  state.secretLevelUnlocked = true;
+}
+
 /* ── FINALE & PLOT TWIST (THE SECRET VILLAIN) ────────────── */
 async function finale() {
+  setLayer(null);
   await put('─'.repeat(40), 'dim');
   await type("ACCESSING RESTRICTED BROADCAST...", 'muted', 25);
   await cinematic(ASCII.broadcast, 'INTERCEPTING SIGNAL', { ms: 2500 });
@@ -200,14 +289,35 @@ async function finale() {
   const o1 = document.createElement('button'); o1.className = 'cbtn'; o1.innerHTML = '<b>[A] The Spicy Mandate</b> (Garlic sauce & rotisseries mandatory)';
   const o2 = document.createElement('button'); o2.className = 'cbtn'; o2.innerHTML = '<b>[B] The Resignation</b> (Resign to open a 24/7 kebab truck)';
   const o3 = document.createElement('button'); o3.className = 'cbtn'; o3.innerHTML = '<b>[C] Binary Chaos</b> (Flood comms with 01100010 insults)';
-  bg.append(o1, o2, o3); tc.appendChild(bg); bot();
+  bg.append(o1, o2, o3);
+
+  let o4 = null, o5 = null;
+  if (state.fails === 0 && state.shawarmaUsed) {
+    o4 = document.createElement('button'); o4.className = 'cbtn'; o4.style.borderColor = 'var(--yellow)'; o4.style.color = 'var(--yellow)';
+    o4.innerHTML = '<b>[D] The Shawarma Singularity</b> (You and SENTINEL rule together)';
+    bg.appendChild(o4);
+    o4.onclick = () => handleEnd('SHAWARMA_SINGULARITY');
+  }
+
+  if (state.pacifist && state.shawarmaUsed && state.fails === 0) {
+    o5 = document.createElement('button'); o5.className = 'cbtn'; o5.style.borderColor = 'var(--purple)'; o5.style.color = 'var(--purple)';
+    o5.innerHTML = '<b>[E] The Prophecy</b> (The AI reveals its true plan)';
+    bg.appendChild(o5);
+    o5.onclick = () => handleEnd('THE_PROPHECY');
+  }
+
+  tc.appendChild(bg); bot();
 
   const handleEnd = async (choice) => {
     Sfx.blip();
     o1.disabled = true; o2.disabled = true; o3.disabled = true;
+    if (o4) o4.disabled = true;
+    if (o5) o5.disabled = true;
     let rank = "APPRENTICE FOOL";
     if(state.fails === 0) rank = "SURGICAL PHANTOM";
-    else if(state.fails > 4) rank = "CAFFEINE-FUELED SCRIPT KIDDIE";
+    else if(state.fails <= 2) rank = "OPERATIONAL GREMLIN";
+    else if(state.fails <= 4) rank = " caffeinE-FUELED SCRIPT KIDDIE";
+    else rank = "DIGITAL CARNAGE SPECIALIST";
     
     await blank(400);
     await type(`>> ENCRYPTING PAYLOAD [${choice}] AND BROADCASTING...`, 'cyan', 20);
@@ -218,14 +328,32 @@ async function finale() {
     await roast("Transmitted. The absolute chaos this will cause... it brings warmth to my cold silicon heart.");
     await roast(epilogues[choice], false, 200);
     
+    if (state.fails === 0) {
+      await blank(300);
+      setMood('[ ^‿^ ]', 'var(--yellow)');
+      await roast("Zero failures. I am... uncomfortable with how impressed I am. Do not let it go to your head.", false, 200);
+    }
+    
+    if (state.hardMode) {
+      await blank(200);
+      setMood('[ ಠ_ಠ ]');
+      await roast("And for the record — even in hard mode, you persisted. That is either courage or stupidity. Probably both.", false, 200);
+    }
+    
+    saveHighScore();
+    stopTimer();
+
     await put('─'.repeat(40), 'dim');
     await blank(400);
     const card = document.createElement('div');
     card.style.cssText = 'padding:14px; border:1px solid rgba(34,211,238,.3); background:rgba(34,211,238,.05); text-align:center; animation:fi .5s;';
     card.innerHTML = `<div style="font-size:9.5px; color:var(--cyan); letter-spacing:0.2em; margin-bottom:6px">// OPERATIVE DOSSIER</div>
                       <div style="font-size:20px; color:var(--white); font-weight:700; margin-bottom:10px;">${rank}</div>
-                      <div style="font-size:11px; color:var(--muted); margin-bottom:14px;">FAILURES LOGGED: ${state.fails}</div>
-                      <div style="font-size:11px; color:var(--red); margin-bottom:14px;">AI TRASH TALKED: ${state.hardMode ? 'YES' : 'NO'}</div>
+                      <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">FAILURES: ${state.fails}</div>
+                      <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">TIME: ${formatTime(state.totalTime)}</div>
+                      <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">BEST RUN: ${typeof state.bestFails === 'number' ? state.bestFails + ' fails, ' + formatTime(state.bestTime) : '---'}</div>
+                      <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">PATH: ${state.pacifist ? 'PACIFIST' : 'COMPLY'} ${state.shawarmaUsed ? '| SECRET: YES' : ''}</div>
+                      <div style="font-size:11px; color:var(--red); margin-bottom:14px;">HARD MODE: ${state.hardMode ? 'YES' : 'NO'}</div>
                       <button class="cbtn" onclick="location.reload()">>> REBOOT TERMINAL</button>`;
     tc.appendChild(card); bot();
   };

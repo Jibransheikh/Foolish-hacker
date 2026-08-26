@@ -19,6 +19,7 @@ function runGame5() {
   let warned = false;
 
   function loop() {
+    if (isPaused) return;
     ctx.fillStyle = '#08080f'; ctx.fillRect(0,0,W,H);
     
     let remain = 30 - Math.floor((Date.now() - startTime)/1000);
@@ -65,6 +66,7 @@ function runGame5() {
     if (activeT >= 3) return winGame5();
     activeLoop = requestAnimationFrame(loop);
   }
+  gameLoopFn = loop;
   activeLoop = requestAnimationFrame(loop);
 }
 

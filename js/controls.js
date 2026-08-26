@@ -1,5 +1,6 @@
 /* ── GAME ENGINE HELPERS & CONTROLS ─────────────────────── */
 let activeLoop = null;
+let gameLoopFn = null;
 let gameKeys = {};
 let touchLeft = false, touchRight = false;
 const IS_TOUCH = window.matchMedia('(hover: none), (pointer: coarse)').matches;

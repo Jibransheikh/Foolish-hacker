@@ -13,9 +13,66 @@ const cineArt = document.getElementById('cineArt');
 const cineLabel = document.getElementById('cineLabel');
 const terminalEl = document.querySelector('.terminal');
 
-let state = { name: "FOOL", fails: 0, hardMode: false, pongCheated: false };
+let state = { name: "FOOL", fails: 0, hardMode: false, pongCheated: false, pacifist: false, secretLevelUnlocked: false, shawarmaUsed: false, nearMisses: 0, totalTime: 0, startTime: 0 };
 let g1Sabotaged = true;
 let easterEggTriggered = false;
+let isPaused = false;
+let timerInterval = null;
+
+const defaultSettings = { speechOn: true, sfxOn: true, scanlinesOn: true };
+let settings = { ...defaultSettings };
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('foolish_hacker_save'));
+    if (saved) {
+      if (saved.settings) settings = { ...defaultSettings, ...saved.settings };
+      if (typeof saved.bestFails === 'number') state.bestFails = saved.bestFails;
+      if (typeof saved.bestTime === 'number') state.bestTime = saved.bestTime;
+      if (typeof saved.playCount === 'number') state.playCount = saved.playCount;
+      else state.playCount = 0;
+    }
+  } catch(e) {}
+}
+
+function saveState() {
+  try {
+    const data = {
+      settings,
+      bestFails: state.bestFails,
+      bestTime: state.bestTime,
+      playCount: (state.playCount || 0) + 1
+    };
+    localStorage.setItem('foolish_hacker_save', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function saveHighScore() {
+  try {
+    if (typeof state.bestFails !== 'number' || state.fails < state.bestFails) state.bestFails = state.fails;
+    const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+    if (typeof state.bestTime !== 'number' || elapsed < state.bestTime) state.bestTime = elapsed;
+    saveState();
+  } catch(e) {}
+}
+
+function startTimer() {
+  state.startTime = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => { if (!isPaused) state.totalTime = Math.floor((Date.now() - state.startTime) / 1000); }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+loadState();
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function trimHistory(max = 80) { while (tc.children.length > max) tc.removeChild(tc.firstChild); }
@@ -38,6 +95,11 @@ function put(text, cls = '') { const ln = mkLn(cls); ln.textContent = text; bot(
 function setMood(mood, color = 'var(--cyan)') {
   aiMoodEl.textContent = `${mood} SENTINEL_AI`;
   aiMoodEl.style.color = color;
+}
+
+function setLayer(n) {
+  terminalEl.classList.remove('layer-1','layer-2','layer-3','layer-4','layer-5','layer-secret');
+  if (n) terminalEl.classList.add('layer-' + n);
 }
 
 async function roast(text, isAngry = false, ms = 400) {
@@ -142,6 +204,63 @@ function gameFail(roastText, retryCallback, label, offerSpaghetti = true, custom
     }
   });
 }
+
+/* ── PAUSE SYSTEM ────────────────────────────────────────── */
+function pauseGame() {
+  if (isPaused || !activeLoop || !gameLoopFn) return;
+  isPaused = true;
+  cancelAnimationFrame(activeLoop);
+  activeLoop = null;
+  document.getElementById('pauseOverlay').classList.add('show');
+}
+
+function resumeGame() {
+  if (!isPaused) return;
+  isPaused = false;
+  document.getElementById('pauseOverlay').classList.remove('show');
+  if (gameLoopFn) activeLoop = requestAnimationFrame(gameLoopFn);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Escape') {
+    if (isPaused) resumeGame();
+    else pauseGame();
+  }
+});
+
+/* ── WIN EFFECT ──────────────────────────────────────────── */
+function winEffect(color) {
+  const flash = document.createElement('div');
+  flash.style.cssText = `position:fixed;inset:0;z-index:55;background:${color};opacity:0.25;pointer-events:none;transition:opacity .3s;`;
+  document.body.appendChild(flash);
+  Sfx.victory();
+  setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 300); }, 100);
+}
+
+/* ── HIDDEN COMMAND DETECTION ─────────────────────────────── */
+let cmdBuffer = '';
+let cmdTimer = null;
+let cmdListening = false;
+
+function startCmdListening() {
+  cmdBuffer = '';
+  cmdListening = true;
+}
+function stopCmdListening() { cmdListening = false; cmdBuffer = ''; }
+
+document.addEventListener('keydown', e => {
+  if (!cmdListening || isPaused || (activeLoop && gameLoopFn)) return;
+  if (e.key.length === 1) {
+    cmdBuffer += e.key.toLowerCase();
+    clearTimeout(cmdTimer);
+    cmdTimer = setTimeout(() => { cmdBuffer = ''; }, 2000);
+    if (cmdBuffer.includes('shawarma')) {
+      cmdBuffer = '';
+      stopCmdListening();
+      if (typeof onShawarmaCommand === 'function') onShawarmaCommand();
+    }
+  }
+});
 
 /* ── CINEMATIC / VIDEO-ART MOMENTS ───────────────────────── */
 async function cinematic(art, label, { red = false, ms = 2000 } = {}) {

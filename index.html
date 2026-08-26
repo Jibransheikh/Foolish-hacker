@@ -24,6 +24,7 @@
       <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
       <span class="ttitle">user@workstation:~$ ./foolish_hacker.sh</span>
       <span class="tai-mood" id="aiMood">[ -_- ] SENTINEL_AI</span>
+      <button class="settings-btn" id="settingsBtn" title="Settings">⚙</button>
     </div>
     <div class="tcontent" id="tc"></div>
     <div class="game-section" id="gs">
@@ -42,6 +43,24 @@
     <div class="cine-label" id="cineLabel"></div>
   </div>
 
+  <div class="pause-overlay" id="pauseOverlay">
+    <div class="pause-box">
+      <div class="pause-title">[ SYSTEM PAUSED ]</div>
+      <div class="pause-sub">SENTINEL_AI is waiting...</div>
+      <button class="cbtn" id="pauseResume">>> RESUME</button>
+    </div>
+  </div>
+
+  <div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-box">
+      <div class="settings-header">// SETTINGS</div>
+      <label class="settings-toggle"><input type="checkbox" id="setSpeech" checked> Speech (AI Voice)</label>
+      <label class="settings-toggle"><input type="checkbox" id="setSfx" checked> Sound Effects</label>
+      <label class="settings-toggle"><input type="checkbox" id="setScanlines" checked> Scanlines</label>
+      <button class="cbtn" id="settingsClose">>> CLOSE</button>
+    </div>
+  </div>
+
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/speech.js"></script>
@@ -52,6 +71,7 @@
 <script src="js/games/snake.js"></script>
 <script src="js/games/pong.js"></script>
 <script src="js/games/tumblers.js"></script>
+<script src="js/games/shawarma.js"></script>
 <script src="js/story.js"></script>
 <script src="js/debug.js"></script>
 </body>

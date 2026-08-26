@@ -14,7 +14,7 @@ const Sfx = {
     this.droneOsc.start();
   },
   playTone(freq, type, duration, vol) {
-    if (!this.ctx) return;
+    if (!this.ctx || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = type;
@@ -27,7 +27,7 @@ const Sfx = {
     osc.stop(this.ctx.currentTime + duration);
   },
   noise(dur, vol) {
-    if (!this.ctx) return;
+    if (!this.ctx || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
     const bufSize = this.ctx.sampleRate * dur;
     const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -47,6 +47,7 @@ const Sfx = {
   ping() { this.playTone(1200, 'sine', 0.15, 0.04); }, 
   roast() { this.playTone(150, 'sawtooth', 0.3, 0.06); }, 
   alarm() { this.playTone(400, 'square', 0.4, 0.05); setTimeout(() => this.playTone(450, 'square', 0.4, 0.05), 200); }, 
-  shoot() { this.noise(0.08, 0.08); } 
+  shoot() { this.noise(0.08, 0.08); },
+  victory() { this.playTone(523, 'sine', 0.12, 0.05); setTimeout(() => this.playTone(659, 'sine', 0.12, 0.05), 100); setTimeout(() => this.playTone(784, 'sine', 0.2, 0.05), 200); }
 };
 

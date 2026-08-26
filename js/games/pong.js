@@ -10,6 +10,7 @@ function runGame4() {
   state.pongCheated = false;
 
   function loop() {
+    if (isPaused) return;
     ctx.fillStyle = '#08080f'; ctx.fillRect(0,0,W,H);
     ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth=2; ctx.beginPath(); ctx.setLineDash([8,8]);
     ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke(); ctx.setLineDash([]);
@@ -52,6 +53,7 @@ function runGame4() {
     if (pScore >= 3) return winGame4();
     activeLoop = requestAnimationFrame(loop);
   }
+  gameLoopFn = loop;
   activeLoop = requestAnimationFrame(loop);
 }
 
@@ -74,6 +76,7 @@ async function winGame4() {
   await roast("Align the signal tumblers. Press Space or tap the screen when the moving block overlaps the golden target zone.");
 
   showMobileControls(false);
+  setLayer(5);
   await awaitAction("START LAYER 5");
   clicked = false; gameKeys['Space'] = false;
   gs.style.display = 'flex'; bot(); runGame5();
