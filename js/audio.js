@@ -1,6 +1,6 @@
 /* ── WEB AUDIO API SYNTHESIZER ───────────────────────────── */
 const Sfx = {
-  ctx: null, droneOsc: null, droneGain: null,
+  ctx: null, droneOsc: null, droneGain: null, muted: false,
   init() {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -12,9 +12,15 @@ const Sfx = {
     this.droneOsc.connect(this.droneGain);
     this.droneGain.connect(this.ctx.destination);
     this.droneOsc.start();
+    this.updateDrone();
+  },
+  updateDrone() {
+    if (!this.ctx || !this.droneGain) return;
+    const muted = this.muted || (typeof settings !== 'undefined' && !settings.sfxOn);
+    this.droneGain.gain.setTargetAtTime(muted ? 0 : 0.04, this.ctx.currentTime, 0.05);
   },
   playTone(freq, type, duration, vol) {
-    if (!this.ctx || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
+    if (!this.ctx || this.muted || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = type;
@@ -27,7 +33,7 @@ const Sfx = {
     osc.stop(this.ctx.currentTime + duration);
   },
   noise(dur, vol) {
-    if (!this.ctx || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
+    if (!this.ctx || this.muted || (typeof settings !== 'undefined' && !settings.sfxOn)) return;
     const bufSize = this.ctx.sampleRate * dur;
     const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
     const data = buf.getChannelData(0);

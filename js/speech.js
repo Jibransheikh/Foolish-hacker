@@ -6,7 +6,7 @@ const Speech = {
     window.speechSynthesis.onvoiceschanged = () => { this.voices = window.speechSynthesis.getVoices(); };
   },
   say(text) {
-    if (!window.speechSynthesis || (typeof settings !== 'undefined' && !settings.speechOn)) return;
+    if (!window.speechSynthesis || (typeof settings !== 'undefined' && (settings.muted || !settings.speechOn))) return;
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(text);
     msg.pitch = 0.3; // Deep, robotic pitch

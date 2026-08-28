@@ -2,9 +2,20 @@
 document.getElementById('initBtn').addEventListener('click', () => {
   document.getElementById('pre-boot').classList.add('hidden');
   document.getElementById('terminal').classList.add('active');
+  Sfx.muted = settings.muted;
   Sfx.init();
   Speech.init();
+  document.getElementById('muteBtn').textContent = settings.muted ? '🔇' : '🔊';
   setTimeout(boot, 800);
+});
+
+/* ── MUTE TOGGLE ──────────────────────────────────────────── */
+document.getElementById('muteBtn').addEventListener('click', () => {
+  settings.muted = !settings.muted;
+  Sfx.muted = settings.muted;
+  Sfx.updateDrone();
+  document.getElementById('muteBtn').textContent = settings.muted ? '🔇' : '🔊';
+  saveState();
 });
 
 /* ── SETTINGS & PAUSE UI ─────────────────────────────────── */
@@ -19,6 +30,7 @@ document.getElementById('settingsClose').addEventListener('click', () => {
   settings.sfxOn = document.getElementById('setSfx').checked;
   settings.scanlinesOn = document.getElementById('setScanlines').checked;
   document.querySelector('.scanlines').style.display = settings.scanlinesOn ? '' : 'none';
+  Sfx.updateDrone();
   document.getElementById('settingsOverlay').classList.remove('show');
   saveState();
 });

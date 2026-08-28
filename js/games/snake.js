@@ -26,6 +26,17 @@ function runGame3() {
     nextDir = { x, y };
   }
 
+  function spawnFood() {
+    for (let i = 0; i < 200; i++) {
+      const x = Math.floor(Math.random() * (gw - 2)) + 1;
+      const y = Math.floor(Math.random() * (gh - 2)) + 1;
+      const onSnake = snake.some(s => s.x === x && s.y === y);
+      const onWall = firewalls.some(f => f.x === x && f.y === y);
+      if (!onSnake && !onWall) return { x, y };
+    }
+    return { x: 12, y: 8 };
+  }
+
   bindControls('tap-turn', s => {
     if (dir.x === 1) turn(0, s);
     else if (dir.y === -1) turn(s, 0);
@@ -55,7 +66,7 @@ function runGame3() {
       snake.unshift(h);
       if(h.x === food.x && h.y === food.y) {
         Sfx.blip();
-        score++; food = {x: Math.floor(Math.random()*(gw-2))+1, y: Math.floor(Math.random()*(gh-2))+1};
+        score++; food = spawnFood();
       } else { snake.pop(); }
     }
 

@@ -88,7 +88,7 @@ function runGame1() {
     ball.x += ball.vx; ball.y += ball.vy;
     if(ball.x - ball.r < 0 || ball.x + ball.r > W) ball.vx *= -1;
     if(ball.y - ball.r < 0) ball.vy *= -1;
-    if(ball.y + ball.r >= paddle.y && ball.x >= paddle.x && ball.x <= paddle.x + paddle.w) {
+    if(ball.vy > 0 && ball.y + ball.r >= paddle.y && ball.x >= paddle.x && ball.x <= paddle.x + paddle.w) {
       Sfx.bloop();
       ball.vy = -Math.abs(ball.vy);
       ball.vx = ((ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2)) * 4.5 * mult;

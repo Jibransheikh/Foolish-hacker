@@ -44,8 +44,14 @@ function runGame2() {
         ctx.fillStyle = t.isShawarma ? '#fbbf24' : '#f87171'; 
         ctx.font = '10px monospace'; ctx.fillText(t.isShawarma ? 'WRAP' : 'ERR', t.x-10, t.y+3);
       }
-      if(t.x > W + 20 && t.active && !t.isShawarma) { t.active = false; escaped++; combo = 0; Sfx.bloop(); }
+      if(t.x > W + 20 && t.active) {
+        t.active = false;
+        if (t.isShawarma) return;
+        escaped++; combo = 0; Sfx.bloop();
+      }
     });
+
+    if (targets.length > 40) targets = targets.filter(t => t.active);
 
     ctx.strokeStyle = '#4ade80'; ctx.beginPath();
     ctx.moveTo(mouseX-10, mouseY); ctx.lineTo(mouseX+10, mouseY);

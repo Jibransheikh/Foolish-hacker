@@ -19,7 +19,7 @@ let easterEggTriggered = false;
 let isPaused = false;
 let timerInterval = null;
 
-const defaultSettings = { speechOn: true, sfxOn: true, scanlinesOn: true };
+const defaultSettings = { speechOn: true, sfxOn: true, scanlinesOn: true, muted: false };
 let settings = { ...defaultSettings };
 
 function loadState() {
@@ -147,62 +147,62 @@ const failVoices = [
   "Even a poultry specimen could surpass this performance."
 ];
 
-function gameFail(roastText, retryCallback, label, offerSpaghetti = true, customVoice = null) {
+async function gameFail(roastText, retryCallback, label, offerSpaghetti = true, customVoice = null) {
   stopGame(); state.fails++; 
-  return new Promise(async resolve => {
-    await sleep(800); 
-    gs.style.display = 'none';
-    
-    // Play the audio roast
-    if (customVoice) {
-      Speech.say(customVoice);
-    } else {
-      Speech.say(failVoices[Math.floor(Math.random() * failVoices.length)]);
-    }
+  await sleep(800); 
+  gs.style.display = 'none';
+  
+  if (customVoice) Speech.say(customVoice);
+  else Speech.say(failVoices[Math.floor(Math.random() * failVoices.length)]);
 
-    const f = failMoments[Math.floor(Math.random() * failMoments.length)];
-    await cinematic(f.art, f.label, { red: true, ms: 1800 });
-    
-    setMood('[ ಥ_ಥ ]', 'var(--red)');
-    await roast(roastText, true, 200);
-    await type(">> AWAITING OPERATIVE READINESS...", 'dim', 15);
-    
-    const bg = document.createElement('div'); bg.className = 'btn-group';
-    const b1 = document.createElement('button'); b1.className = 'cbtn'; b1.innerHTML = `>> ${label}`;
-    bg.appendChild(b1);
+  const f = failMoments[Math.floor(Math.random() * failMoments.length)];
+  await cinematic(f.art, f.label, { red: true, ms: 1800 });
+  
+  setMood('[ ಥ_ಥ ]', 'var(--red)');
+  await roast(roastText, true, 200);
+  await type(">> AWAITING OPERATIVE READINESS...", 'dim', 15);
+  
+  const bg = document.createElement('div'); bg.className = 'btn-group';
+  const b1 = document.createElement('button'); b1.className = 'cbtn'; b1.innerHTML = `>> ${label}`;
+  bg.appendChild(b1);
 
-    let b2 = null;
-    if (offerSpaghetti && !state.hardMode) {
-      b2 = document.createElement('button'); b2.className = 'cbtn cbtn-danger'; b2.innerHTML = `>> [REPLY]: "Your code is spaghetti."`;
-      bg.appendChild(b2);
-    }
-    tc.appendChild(bg); bot();
+  let b2 = null;
+  if (offerSpaghetti && !state.hardMode) {
+    b2 = document.createElement('button'); b2.className = 'cbtn cbtn-danger'; b2.innerHTML = `>> [REPLY]: "Your code is spaghetti."`;
+    bg.appendChild(b2);
+  }
+  tc.appendChild(bg); bot();
 
-    b1.onclick = () => {
-      Sfx.blip();
-      b1.disabled = true; if(b2) b2.disabled = true;
-      b1.style.borderColor = 'var(--cyan)'; b1.style.color = 'var(--cyan)';
-      cleanup();
+  let retryResolve;
+  const retryPromise = new Promise(r => { retryResolve = r; });
+
+  function finish() {
+    setMood('[ -_- ]'); clicked = false; touchLeft = false; touchRight = false; gameKeys['Space'] = false;
+    gs.style.display = 'flex'; bot(); retryCallback();
+    if (retryResolve) retryResolve();
+  }
+
+  b1.onclick = () => {
+    Sfx.blip();
+    b1.disabled = true; if(b2) b2.disabled = true;
+    b1.style.borderColor = 'var(--cyan)'; b1.style.color = 'var(--cyan)';
+    finish();
+  };
+  
+  if (b2) {
+    b2.onclick = async () => {
+      Sfx.alarm();
+      b1.disabled = true; b2.disabled = true;
+      b2.style.borderColor = 'var(--red)'; b2.style.color = 'var(--red)';
+      setMood('[ ಠ_ಠ ]', 'var(--red)');
+      Speech.say("Suffer.");
+      await roast("EXCUSE ME? My architecture is flawless. I am increasing game cycle speed by 25%. Suffer.", true, 200);
+      state.hardMode = true;
+      finish();
     };
-    
-    if (b2) {
-      b2.onclick = async () => {
-        Sfx.alarm();
-        b1.disabled = true; b2.disabled = true;
-        b2.style.borderColor = 'var(--red)'; b2.style.color = 'var(--red)';
-        setMood('[ ಠ_ಠ ]', 'var(--red)');
-        Speech.say("Suffer.");
-        await roast("EXCUSE ME? My architecture is flawless. I am increasing game cycle speed by 25%. Suffer.", true, 200);
-        state.hardMode = true;
-        cleanup();
-      };
-    }
+  }
 
-    function cleanup() {
-      setMood('[ -_- ]'); clicked = false; touchLeft = false; touchRight = false; gameKeys['Space'] = false;
-      gs.style.display = 'flex'; bot(); resolve(); retryCallback();
-    }
-  });
+  await retryPromise;
 }
 
 /* ── PAUSE SYSTEM ────────────────────────────────────────── */
