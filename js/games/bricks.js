@@ -2,17 +2,18 @@
 function runGame1Pacifist() {
   stopGame(); bindControls('hold');
   const { w: W, h: H } = fitCanvas();
-  let mult = state.hardMode ? 1.25 : 1;
-  let paddle = { x: W/2 - 40, y: H - 20, w: 80, h: 10, speed: 5.5 * mult };
-  let lives = 3;
-  let bricks = [];
-  const rows = 3, cols = 5, bw = (W - 40)/cols, bh = 14;
+  let mult = gameMult();
+  let paddle = { x: W/2 - 50, y: H - 20, w: 100, h: 10, speed: 6.5 * mult };
+  let lives = 5;
+  const rows = 3, cols = 4, bw = (W - 40)/cols, bh = 14;
+  let queue = [];
   for(let r=0; r<rows; r++) for(let c=0; c<cols; c++) {
-    bricks.push({ x: 20 + c*bw, y: -20 - r*22, w: bw-2, h: bh, active: true, vy: 1.2 * mult + Math.random()*0.8 });
+    queue.push({ x: 20 + c*bw + bw/2 - (bw-2)/2 });
   }
-  let spawnTimer = 0;
-  const totalBricks = rows * cols;
+  const totalBricks = queue.length;
   let caught = 0;
+  let current = null;
+  let spawnAt = 0;
 
   function loop(ts) {
     if (isPaused) return;
@@ -29,24 +30,26 @@ function runGame1Pacifist() {
     ctx.fillStyle = 'rgba(74,222,128,0.15)'; ctx.fillRect(0, H - 6, W, 6);
     ctx.fillStyle = '#4ade80'; ctx.font = '9px monospace'; ctx.fillText('SERVER CORE', 10, H - 10);
 
-    let activeBricks = 0;
-    bricks.forEach(b => {
-      if (!b.active) return;
-      b.y += b.vy;
-      activeBricks++;
+    // Spawn packets one at a time so a single paddle can always keep up
+    if (!current && queue.length && ts >= spawnAt) {
+      const b = queue.shift();
+      current = { x: b.x, y: -20, w: bw-2, h: bh, vy: (1.5 + Math.random()*0.7) * mult };
+    }
 
+    if (current) {
+      current.y += current.vy;
       ctx.fillStyle = 'rgba(34,211,238,0.3)'; ctx.strokeStyle = '#22d3ee';
-      ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.fillRect(current.x, current.y, current.w, current.h); ctx.strokeRect(current.x, current.y, current.w, current.h);
 
       // Caught by paddle
-      if (b.y + b.h >= paddle.y && b.y + b.h <= paddle.y + paddle.h + 8 && b.x + b.w > paddle.x && b.x < paddle.x + paddle.w) {
-        Sfx.ping(); b.active = false; caught++;
+      if (current.y + current.h >= paddle.y && current.y + current.h <= paddle.y + paddle.h + 8 && current.x + current.w > paddle.x && current.x < paddle.x + paddle.w) {
+        Sfx.ping(); caught++; current = null; spawnAt = ts + 450;
       }
       // Hit the bottom
-      if (b.y > H) {
-        b.active = false; lives--; Sfx.alarm();
+      else if (current.y > H) {
+        current = null; lives--; Sfx.alarm(); spawnAt = ts + 450;
       }
-    });
+    }
 
     ctx.fillStyle = '#e2e8f0'; ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
     ctx.fillStyle = '#fbbf24'; ctx.font = '11.5px monospace';
@@ -64,7 +67,7 @@ function runGame1() {
   if (state.pacifist) return runGame1Pacifist();
   stopGame(); bindControls('hold');
   const { w: W, h: H } = fitCanvas();
-  let mult = state.hardMode ? 1.25 : 1;
+  let mult = gameMult();
   let paddle = { x: W/2 - 40, y: H - 20, w: 80, h: 10, speed: 5.5 * mult };
   let ball = { x: W/2, y: H - 40, r: 4, vx: 4 * mult * (Math.random()>0.5?1:-1), vy: -4 * mult };
   let bricks = [];
@@ -117,6 +120,7 @@ function runGame1() {
           setMood('[ ^‿^ ]', 'var(--cyan)');
           await roast("HAHAHA FOOL! Did you really think I'd make it that easy? I inverted your controls. Okay, okay, I'm done sabotaging, please proceed...", false, 200);
           Speech.say("Normalizing input vectors.");
+          toast('SENTINEL WAS SABOTAGING YOU', 'var(--red)');
           await type(">> NORMALIZING INPUT VECTORS...", 'dim', 15);
           await awaitAction('RESTART LAYER 1');
           setMood('[ -_- ]'); touchLeft = false; touchRight = false; gs.style.display = 'flex'; bot(); runGame1();
@@ -132,6 +136,7 @@ function runGame1() {
         return (async () => {
           await sleep(1000); gs.style.display = 'none'; setMood('[ ^‿^ ]', 'var(--cyan)');
           await roast("HAHAHA FOOL! Controls were inverted that entire run and you still cleared it. Fine — normalizing input vectors for the rest of this.", false, 200);
+          toast('INPUT VECTORS NORMALIZED', 'var(--cyan)');
           await winGame1();
         })();
       }

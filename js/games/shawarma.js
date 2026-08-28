@@ -5,7 +5,7 @@ function runSecretGame(onWin) {
   _secretOnWin = onWin || _secretOnWin;
   stopGame(); bindControls('hold');
   const { w: W, h: H } = fitCanvas();
-  let mult = state.hardMode ? 1.25 : 1;
+  let mult = gameMult();
   let paddle = { x: W/2 - 50, y: H - 24, w: 100, h: 14, speed: 6 * mult };
   
   const ingredients = [

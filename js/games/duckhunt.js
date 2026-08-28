@@ -2,7 +2,7 @@
 function runGame2() {
   stopGame();
   const { w: W, h: H } = fitCanvas();
-  let mult = state.hardMode ? 1.25 : 1;
+  let mult = gameMult();
   let targets = [];
   let kills = 0, escaped = 0; const targetKills = 7, maxEscapes = 3;
   let lastSpawn = 0; clicked = false;

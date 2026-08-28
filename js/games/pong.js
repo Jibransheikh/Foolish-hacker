@@ -2,7 +2,7 @@
 function runGame4() {
   stopGame(); bindControls('hold');
   const { w: W, h: H } = fitCanvas();
-  let mult = state.hardMode ? 1.25 : 1;
+  let mult = gameMult();
   let py = H/2 - 25, ay = H/2 - 25;
   let ph = 50, ah = 50;
   let bx = W/2, by = H/2, bvx = 4.5 * mult, bvy = 4.5 * mult;
@@ -22,6 +22,7 @@ function runGame4() {
     if (pScore === 2 && !state.pongCheated) {
       Sfx.alarm();
       Speech.say("The house always wins.");
+      toast('SENTINEL_AI IS CHEATING', 'var(--red)');
       state.pongCheated = true;
       ph = 20; ah = 140; ay = H/2 - 70;
       setMood('[ ಠ_ಠ ]', 'var(--red)');
@@ -29,7 +30,7 @@ function runGame4() {
       put(">> 'ENOUGH. THE HOUSE ALWAYS WINS.'", 'red');
     }
 
-    ay += (by - (ay + ah/2)) * (state.pongCheated ? 0.2 : 0.1);
+    ay += (by - (ay + ah/2)) * (state.pongCheated ? 0.2 : 0.1) * (state.easyMode ? 0.7 : 1);
     ay = Math.max(0, Math.min(H-ah, ay));
 
     bx += bvx; by += bvy;

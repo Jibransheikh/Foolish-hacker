@@ -4,7 +4,7 @@ function runGame5() {
   const { w: W, h: H } = fitCanvas();
   let startTime = Date.now();
   
-  let mult = state.hardMode ? 1.25 : 1;
+  let mult = gameMult();
   let tumblers = [
     { y: 80, speed: 4 * mult, tw: 80, tx: 0, cx: 50, dir: 1, locked: false, w: W-100, ox: 50 },
     { y: 140, speed: 6.5 * mult, tw: 50, tx: 0, cx: 50, dir: 1, locked: false, w: W-100, ox: 50 },

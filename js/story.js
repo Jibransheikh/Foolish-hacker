@@ -81,6 +81,13 @@ async function boot() {
       inp.disabled = true;
       const rawName = inp.value.trim().toUpperCase();
       
+      if (rawName === 'DEV') {
+        tc.innerHTML = '';
+        put('>> DEV MODE: STORY BYPASSED.', 'cyan');
+        showDevMenu();
+        return;
+      }
+
       if (!easterEggTriggered && rawName.includes('SEHAR')) {
         easterEggTriggered = true;
         setMood('[ ಠ_ಠ ]', 'var(--yellow)');
@@ -205,6 +212,7 @@ async function continueBriefing() {
       await roast("Fine. You want to protect instead of destroy? I will reconfigure the encryption layers. But I am NOT going easy on you.", false, 200);
       state.pacifist = true;
       await type(">> RECONFIGURING LAYER 1: DEFENSE MODE", 'orange', 22);
+      toast('ROUTE TO ALTERNATE PATH', 'var(--purple)');
       await roast("Defend the server core. Catch the incoming packets with your paddle. Do not let them breach the firewall.", false, 0);
       resolve();
     };
@@ -261,6 +269,7 @@ async function onShawarmaCommand() {
   setMood('[ ^‿^ ]', 'var(--yellow)');
   await roast("...Fine. You have demonstrated enough... curiosity... to warrant access to the SHAWARMA LAYER. This stays between us.", false, 200);
   await type(">> SECRET LAYER UNLOCKED: SHAWARMA ASSEMBLY", 'yellow', 22);
+  toast('SECRET LAYER UNLOCKED', 'var(--yellow)');
   state.secretLevelUnlocked = true;
 }
 
@@ -365,9 +374,16 @@ async function finale() {
                       <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">TIME: ${formatTime(state.totalTime)}</div>
                       <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">BEST RUN: ${typeof state.bestFails === 'number' ? state.bestFails + ' fails, ' + formatTime(state.bestTime) : '---'}</div>
                       <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">PATH: ${state.pacifist ? 'PACIFIST' : 'COMPLY'} ${state.shawarmaUsed ? '| SECRET: YES' : ''}</div>
-                      <div style="font-size:11px; color:var(--red); margin-bottom:14px;">HARD MODE: ${state.hardMode ? 'YES' : 'NO'}</div>
+                      <div style="font-size:11px; color:var(--red); margin-bottom:6px;">HARD MODE: ${state.hardMode ? 'YES' : 'NO'}</div>
+                      <div style="font-size:11px; color:var(--green); margin-bottom:14px;">EASY MODE: ${state.easyMode ? 'YES' : 'NO'}</div>
                       <button class="cbtn" onclick="location.reload()">>> REBOOT TERMINAL</button>`;
     tc.appendChild(card); bot();
+
+    const hint = document.createElement('div');
+    hint.className = 'dim';
+    hint.style.cssText = 'font-size:9.5px; color:var(--muted); margin:14px auto 0; text-align:center; line-height:1.6;';
+    hint.textContent = '> TIP FOR THE NEXT RUN: type "DEV" as your name to explore every layer and every difficulty in the sandbox.';
+    tc.appendChild(hint); bot();
   };
 
   o1.onclick = () => handleEnd('SPICY_MANDATE'); o2.onclick = () => handleEnd('KEBAB_RESIGNATION'); o3.onclick = () => handleEnd('BINARY_INSULT_FLOOD');

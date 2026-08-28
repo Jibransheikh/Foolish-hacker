@@ -8,7 +8,7 @@ function runGame3() {
   let dir = {x:1, y:0}, nextDir = {x:1, y:0};
   let food = {x: 12, y: 8}, score = 0;
   let lastT = 0;
-  let stepDelay = state.hardMode ? 60 : 85;
+  let stepDelay = state.hardMode ? 60 : (state.easyMode ? 110 : 85);
   const targetScore = state.pacifist ? 3 : 5;
 
   let firewalls = [];
